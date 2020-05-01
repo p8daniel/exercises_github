@@ -5,10 +5,10 @@ from pathlib import Path
 
 def download_yt(video_url, destination_folder):
     if 'playlist' in video_url or 'list' in video_url:
-        path = destination_folder + Path('/%(playlist)s/%(playlist_index)s _ %(title)s.%(ext)s')
+        path = destination_folder + str(Path('/%(playlist)s/%(playlist_index)s _ %(title)s.%(ext)s'))
         ydl = youtube_dl.YoutubeDL({'outtmpl': path})
     else:
-        path = destination_folder + Path('/%(title)s.%(ext)s')
+        path = destination_folder + str(Path('/%(title)s.%(ext)s'))
         ydl = youtube_dl.YoutubeDL({'outtmpl': path})
 
     with ydl:
