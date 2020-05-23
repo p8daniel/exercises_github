@@ -3,13 +3,19 @@ import easygui
 from pathlib import Path
 
 
+
+# https://github.com/ytdl-org/youtube-dl/blob/3e4cedf9e8cd3157df2457df7274d0c842421945/youtube_dl/YoutubeDL.py#L137-L312
+# https://github.com/ytdl-org/youtube-dl/blob/master/README.md#readme
+# https://www.youtube.com/watch?v=qZ8zTmowSgo&list=PL6Iy9ukHIwgxkXlvBQyYzXHNQT73W7Dgf
+# https://www.youtube.com/watch?v=uhSCf5KMANo&list=PL6Iy9ukHIwgz4tKdcNwFOeS4GmDhhlqXe
+
 def download_yt(video_url, destination_folder):
     if 'playlist' in video_url or 'list' in video_url:
         path = destination_folder + str(Path('/%(playlist)s/%(playlist_index)s _ %(title)s.%(ext)s'))
-        ydl = youtube_dl.YoutubeDL({'outtmpl': path})
+        ydl = youtube_dl.YoutubeDL({'outtmpl': path, 'ignoreerrors': True})
     else:
         path = destination_folder + str(Path('/%(title)s.%(ext)s'))
-        ydl = youtube_dl.YoutubeDL({'outtmpl': path})
+        ydl = youtube_dl.YoutubeDL({'outtmpl': path, 'ignoreerrors': True})
 
     with ydl:
         result = ydl.extract_info(
@@ -27,6 +33,9 @@ def download_yt(video_url, destination_folder):
         video = result
         print(video['webpage_url'])
         print(video['title'])
+
+
+
 
 
 if __name__ == "__main__":
