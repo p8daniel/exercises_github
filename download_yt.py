@@ -1,7 +1,12 @@
-import youtube_dl
-import easygui
-from pathlib import Path
+import os
 
+import youtube_dl
+
+# import easygui
+from pathlib import Path
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, APIC, error
+from webptools import dwebp
 
 # https://github.com/ytdl-org/youtube-dl/blob/3e4cedf9e8cd3157df2457df7274d0c842421945/youtube_dl/YoutubeDL.py#L137-L312
 # https://github.com/ytdl-org/youtube-dl/blob/master/README.md#readme
@@ -21,68 +26,110 @@ from pathlib import Path
 # 18          mp4       640x360
 # 22          mp4       1280x720    (best)
 
-def download_yt(video_url, destination_folder):
-    if 'playlist' in video_url or 'list' in video_url:
-        path = destination_folder + str(Path('/%(playlist)s/%(playlist_index)s _ %(title)s.%(ext)s'))
+ydl_opts_video = {
+    # 'format': 'bestaudio/best',  # choice of quality
+    # 'format': '140/134',  # choice of quality ; see formats above
+    # 'extractaudio': True,  # only keep the audio
+    # "ignoreerrors": True
+}
+
+ydl_opts_audio = {
+    "writethumbnail": True,
+    # 'format': 'bestaudio/best',  # choice of quality
+    "format": "140/134",  # choice of quality ; see formats above
+    # 'extractaudio': True,  # only keep the audio
+    # 'audioformat': "mp3",  # convert to mp3
+    # 'outtmpl': '%(id)s',  # name the file the ID of the video
+    # 'noplaylist': True,  # only download single song, not playlist
+    #
+    "postprocessors": [
+        {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192",}
+    ],
+    # 'postprocessors': [{
+    #     'key': 'FFmpegVideoConvertor',
+    #     'preferedformat': 'avi',
+    # }],
+    "ignoreerrors": True,
+}
+
+
+def download_yt(video_url, destination_folder, ydl_opts):
+    if "playlist" in video_url or "list" in video_url:
+        path = destination_folder + str(
+            Path("/%(playlist)s/%(playlist_index)s _ %(title)s.%(ext)s")
+        )
     else:
-        path = destination_folder + str(Path('/%(title)s.%(ext)s'))
+        path = destination_folder + str(Path("/%(title)s.%(ext)s"))
 
-    ydl_opts = {
-        'writethumbnail': True,
-        # 'format': 'bestaudio/best',  # choice of quality
-        'format': '140/134',  # choice of quality ; see formats above
-        # 'extractaudio': True,  # only keep the audio
-        # 'audioformat': "mp3",  # convert to mp3
-        # 'outtmpl': '%(id)s',  # name the file the ID of the video
-        # 'noplaylist': True,  # only download single song, not playlist
-        #
-        # 'postprocessors': [{
-        #     'key': 'FFmpegExtractAudio',
-        #     'preferredcodec': 'mp3',
-        #     'preferredquality': '192',
-        # }],
-
-        # 'postprocessors': [{
-        #     'key': 'FFmpegVideoConvertor',
-        #     'preferedformat': 'avi',
-        # }],
-
-        'outtmpl': path,
-        'ignoreerrors': True
-    }
+    ydl_opts["outtmpl"] = path
 
     ydl = youtube_dl.YoutubeDL(ydl_opts)
 
     with ydl:
-        result = ydl.extract_info(
-            video_url,
-            download=True
-        )
+        result = ydl.extract_info(video_url, download=True)
 
-    if 'entries' in result:
+    if "entries" in result:
         # Can be a playlist or a list of videos
-        for video in result['entries']:
-            print(video['webpage_url'])
-            print(video['title'])
+        for video in result["entries"]:
+            print(video["webpage_url"])
+            print(video["title"])
     else:
         # Just a video
         video = result
-        print(video['webpage_url'])
-        print(video['title'])
-        print(video['format'])
-        # print(info_dict.get('thumbnail'))
+        print(video["webpage_url"])
+        print(video["title"])
+        print(video["format"])
+    return video["title"]
+
+
+def add_cover_mp3(destination_folder, title):
+    audio_path = destination_folder + title + ".mp3"
+    corrected_title = title.replace(",", "")
+    picture_path_webp_to_fix = Path(destination_folder + title + ".webp")
+    picture_path_webp = Path(destination_folder + corrected_title + ".webp")
+    picture_path_jpg = Path(destination_folder + corrected_title + ".jpg")
+
+
+    os.rename(picture_path_webp_to_fix, picture_path_webp)
+
+
+    # try:
+    # im = Image.open(destination_folder + title + ".webp").convert("RGB")
+    dwebp(picture_path_webp, picture_path_jpg, "-o")
+
+    # except Exception as e:
+    #     print(e)
+    # else:
+    #     im.save(destination_folder + title + ".jpg")
+    picture_path = destination_folder + title + ".jpg"
+    audio = MP3(audio_path, ID3=ID3)
+    # adding ID3 tag if it is not present
+    try:
+        audio.add_tags()
+    except error:
+        pass
+    audio.tags.add(
+        APIC(mime="image/jpeg", type=3, desc=u"Cover", data=open(picture_path, "rb").read(),)
+    )
+    # edit ID3 tags to open and read the picture from the path specified and assign it
+    audio.save()  # save the current changes
+    os.remove(picture_path)
 
 
 if __name__ == "__main__":
     print("Donne moi l'adresse youtube")
     while True:
-        video_url = input('>')
-        if 'www.youtube.com/' in video_url:
+        video_url = input(">")
+        if "www.youtube.com/" in video_url:
             break
         else:
             print("Ceci n'est pas une adresse youtube, reessayer")
             continue
 
-    destination_folder = easygui.diropenbox()
+    # destination_folder = easygui.diropenbox()
+    destination_folder = "/home/daniel.pelati/Videos/"
     print("Destination folder: ", destination_folder)
-    download_yt(video_url, destination_folder)
+    download_yt(video_url, destination_folder, ydl_opts_video)
+    # title = download_yt(video_url, destination_folder, ydl_opts_audio)
+    # title = title.replace("|", "_")
+    # add_cover_mp3(destination_folder, title)
