@@ -7,6 +7,9 @@ from pathlib import Path
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, APIC, error
 from webptools import dwebp
+from PIL import Image
+
+ONLY_AUDIO = True
 
 # https://github.com/ytdl-org/youtube-dl/blob/3e4cedf9e8cd3157df2457df7274d0c842421945/youtube_dl/YoutubeDL.py#L137-L312
 # https://github.com/ytdl-org/youtube-dl/blob/master/README.md#readme
@@ -69,51 +72,62 @@ def download_yt(video_url, destination_folder, ydl_opts):
         result = ydl.extract_info(video_url, download=True)
 
     if "entries" in result:
+        result_titles = []
         # Can be a playlist or a list of videos
         for video in result["entries"]:
             print(video["webpage_url"])
             print(video["title"])
+            result_titles.append(video["title"])
+        return result_titles
     else:
         # Just a video
         video = result
         print(video["webpage_url"])
         print(video["title"])
         print(video["format"])
-    return video["title"]
+    return [video["title"]]
 
 
 def add_cover_mp3(destination_folder, title):
-    audio_path = destination_folder + title + ".mp3"
-    corrected_title = title.replace(",", "")
+    audio_path = Path(destination_folder + title + ".mp3")
+
     picture_path_webp_to_fix = Path(destination_folder + title + ".webp")
-    picture_path_webp = Path(destination_folder + corrected_title + ".webp")
-    picture_path_jpg = Path(destination_folder + corrected_title + ".jpg")
 
+    if os.path.exists(picture_path_webp_to_fix):
 
-    os.rename(picture_path_webp_to_fix, picture_path_webp)
+        picture_path_jpg = Path(destination_folder + "cover" + ".jpg")
+        picture_path_webp = Path(destination_folder + "cover" + ".webp")
 
+        if os.path.exists(picture_path_webp):
+            os.remove(picture_path_webp)
+        if os.path.exists(picture_path_jpg):
+            os.remove(picture_path_jpg)
+        os.rename(picture_path_webp_to_fix, picture_path_webp)
 
-    # try:
-    # im = Image.open(destination_folder + title + ".webp").convert("RGB")
-    dwebp(picture_path_webp, picture_path_jpg, "-o")
+        # dwebp(picture_path_webp, picture_path_jpg, "-o")
+        im = Image.open(picture_path_webp).convert("RGB")
+        im.save(picture_path_jpg)
+        picture_path = picture_path_jpg
+        os.remove(picture_path_webp)
 
-    # except Exception as e:
-    #     print(e)
-    # else:
-    #     im.save(destination_folder + title + ".jpg")
-    picture_path = destination_folder + title + ".jpg"
-    audio = MP3(audio_path, ID3=ID3)
-    # adding ID3 tag if it is not present
-    try:
-        audio.add_tags()
-    except error:
-        pass
-    audio.tags.add(
-        APIC(mime="image/jpeg", type=3, desc=u"Cover", data=open(picture_path, "rb").read(),)
-    )
-    # edit ID3 tags to open and read the picture from the path specified and assign it
-    audio.save()  # save the current changes
-    os.remove(picture_path)
+    else:
+        picture_path = destination_folder + title + ".jpg"
+
+    if os.path.exists(picture_path):
+        audio = MP3(audio_path, ID3=ID3)
+        # adding ID3 tag if it is not present
+        try:
+            audio.add_tags()
+        except:
+            pass
+        audio.tags.add(
+            APIC(mime="image/jpeg", type=3, desc=u"Cover", data=open(picture_path, "rb").read(),)
+        )
+        # edit ID3 tags to open and read the picture from the path specified and assign it
+        audio.save()  # save the current changes
+        os.remove(picture_path)
+    else:
+        raise Exception("picture not found")
 
 
 if __name__ == "__main__":
@@ -127,9 +141,16 @@ if __name__ == "__main__":
             continue
 
     # destination_folder = easygui.diropenbox()
-    destination_folder = "/home/daniel.pelati/Videos/"
-    print("Destination folder: ", destination_folder)
-    download_yt(video_url, destination_folder, ydl_opts_video)
-    # title = download_yt(video_url, destination_folder, ydl_opts_audio)
-    # title = title.replace("|", "_")
-    # add_cover_mp3(destination_folder, title)
+
+    if ONLY_AUDIO:
+        destination_folder = "/home/daniel.pelati/Music/"
+        print("Destination folder: ", destination_folder)
+        titles = download_yt(video_url, destination_folder, ydl_opts_audio)
+
+        for title in titles:
+            title = title.replace("|", "_").replace(":", " -")
+            add_cover_mp3(destination_folder, title)
+    else:
+        destination_folder = "/home/daniel.pelati/Videos/"
+        print("Destination folder: ", destination_folder)
+        download_yt(video_url, destination_folder, ydl_opts_video)
